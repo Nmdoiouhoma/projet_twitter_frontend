@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from "react-router-dom";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const Signup = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -24,7 +28,6 @@ const Signup = () => {
 
     // Appel API au backend avec axios
     try {
-      // On adapte les clés envoyées pour correspondre au backend Symfony
       const payload = {
         email: formData.email,
         firstname: formData.firstName,
@@ -35,16 +38,20 @@ const Signup = () => {
 
       const response = await axios.post('http://127.0.0.1:8000/register', payload);
       console.log('Inscription réussie:', response.data);
-      // ici tu peux par exemple rediriger vers la page de login
-      // ou afficher un message de succès
+
+      toast.success("Inscription réussie !");
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
     } catch (error) {
       console.error('Erreur inscription:', error);
-      // ici tu peux gérer l'affichage d'un message d'erreur
+      toast.error("Erreur lors de l'inscription.");
     }
   };
   
   return (
     <div>
+      <ToastContainer />
       <h1>Page d'inscription</h1>
       <form onSubmit={handleSubmit}>
         <div>
