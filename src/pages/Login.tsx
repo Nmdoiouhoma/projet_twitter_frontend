@@ -20,40 +20,68 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('Données du formulaire:', formData);
-    
-    // Appel API au backend avec axios
-    try {
-      const response = await axios.post('http://127.0.0.1:8000/login', formData);
-      console.log('Connexion réussie:', response.data);
+    console.log('Login form data:', formData);
 
-      toast.success("Connexion réussie !");
+    try {
+      const response = await axios.post(
+        'http://127.0.0.1:8000/api/login',
+        formData
+      );
+
+      console.log('Login success:', response.data);
+
+      // store token for protected routes
+      localStorage.setItem('authToken', response.data.token);
+
+      toast.success('Login successful!');
       setTimeout(() => {
         navigate('/');
-      }, 2000);
-    } catch (error) {
-      console.error('Erreur connexion:', error);
-      toast.error("Erreur lors de la connexion.");
+      }, 1000);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      const msg = error?.response?.data?.error || 'Error while logging in.';
+      toast.error(msg);
     }
   };
 
   return (
     <div>
       <ToastContainer />
-      <h1>Page de connexion</h1>
+      <h1>Sign in</h1>
       <form onSubmit={handleSubmit}>
         <div>
-          <label htmlFor="email">Email ou nom d'utilisateur:</label>
-          <input type="text" id="email" name="email" required value={formData.email} onChange={handleChange} />
+          <label htmlFor="email">Email or username:</label>
+          <input
+            type="text"
+            id="email"
+            name="email"
+            required
+            value={formData.email}
+            onChange={handleChange}
+          />
         </div>
         <div>
-          <label htmlFor="password">Mot de passe:</label>
-          <input type="password" id="password" name="password" required value={formData.password} onChange={handleChange} />
+          <label htmlFor="password">Password:</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            value={formData.password}
+            onChange={handleChange}
+          />
         </div>
-        <button type="submit">Se connecter</button>
+        <button type="submit">Sign in</button>
+        <button
+          type="button"
+          onClick={() => navigate('/signup')}
+          style={{ marginLeft: '1rem' }}
+        >
+          Create account
+        </button>
       </form>
     </div>
-  )
-}
+  );
+};
 
-export default Login
+export default Login;

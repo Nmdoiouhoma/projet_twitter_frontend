@@ -24,9 +24,8 @@ const Signup = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('Données du formulaire:', formData);
+    console.log('Signup form data:', formData);
 
-    // Appel API au backend avec axios
     try {
       const payload = {
         email: formData.email,
@@ -36,23 +35,27 @@ const Signup = () => {
         password: formData.password,
       };
 
-      const response = await axios.post('http://127.0.0.1:8000/register', payload);
-      console.log('Inscription réussie:', response.data);
+      const response = await axios.post(
+        'http://127.0.0.1:8000/api/register',
+        payload
+      );
+      console.log('Signup success:', response.data);
 
-      toast.success("Inscription réussie !");
+      toast.success('Signup successful!');
       setTimeout(() => {
         navigate('/login');
-      }, 2000);
-    } catch (error) {
-      console.error('Erreur inscription:', error);
-      toast.error("Erreur lors de l'inscription.");
+      }, 1000);
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      const msg = error?.response?.data?.error || 'Error while signing up.';
+      toast.error(msg);
     }
   };
   
   return (
     <div>
       <ToastContainer />
-      <h1>Page d'inscription</h1>
+      <h1>Create your account</h1>
       <form onSubmit={handleSubmit}>
         <div>
           <label htmlFor="email">Email:</label>
@@ -66,7 +69,7 @@ const Signup = () => {
           />
         </div>
         <div>
-          <label htmlFor="username">Nom d'utilisateur:</label>
+          <label htmlFor="username">Username:</label>
           <input 
             type="text" 
             id="username" 
@@ -77,7 +80,7 @@ const Signup = () => {
           />
         </div>
         <div>
-          <label htmlFor="lastname">Nom:</label>
+          <label htmlFor="lastname">Last name:</label>
           <input 
             type="text" 
             id="lastname" 
@@ -88,7 +91,7 @@ const Signup = () => {
           />
         </div>
         <div>
-          <label htmlFor="firstName">Prénom:</label>
+          <label htmlFor="firstName">First name:</label>
           <input 
             type="text" 
             id="firstName" 
@@ -99,7 +102,7 @@ const Signup = () => {
           />
         </div>
         <div>
-          <label htmlFor="password">Mot de passe:</label>
+          <label htmlFor="password">Password:</label>
           <input 
             type="password" 
             id="password" 
@@ -109,10 +112,17 @@ const Signup = () => {
             onChange={handleChange}
           />
         </div>
-        <button type="submit">S'inscrire</button>
+        <button type="submit">Sign up</button>
+        <button
+          type="button"
+          onClick={() => navigate('/login')}
+          style={{ marginLeft: '1rem' }}
+        >
+          Sign in
+        </button>
       </form>
     </div>
-  )
+  );
 }
 
-export default Signup
+export default Signup;
