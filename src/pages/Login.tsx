@@ -20,7 +20,7 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('Données du formulaire:', formData);
+    console.log('Login form data:', formData);
 
     try {
       const response = await axios.post(
@@ -28,18 +28,18 @@ const Login = () => {
         formData
       );
 
-      console.log('Connexion réussie:', response.data);
+      console.log('Login success:', response.data);
 
-      // on stocke le token pour les routes protégées
+      // store token for protected routes
       localStorage.setItem('authToken', response.data.token);
 
-      toast.success("Connexion réussie !");
+      toast.success('Login successful!');
       setTimeout(() => {
         navigate('/');
       }, 1000);
     } catch (error: any) {
-      console.error('Erreur connexion:', error);
-      const msg = error?.response?.data?.error || "Erreur lors de la connexion.";
+      console.error('Login error:', error);
+      const msg = error?.response?.data?.error || 'Error while logging in.';
       toast.error(msg);
     }
   };
@@ -47,10 +47,10 @@ const Login = () => {
   return (
     <div>
       <ToastContainer />
-      <h1>Page de connexion</h1>
+      <h1>Sign in</h1>
       <form onSubmit={handleSubmit}>
         <div>
-          <label htmlFor="email">Email ou nom d'utilisateur:</label>
+          <label htmlFor="email">Email or username:</label>
           <input
             type="text"
             id="email"
@@ -61,7 +61,7 @@ const Login = () => {
           />
         </div>
         <div>
-          <label htmlFor="password">Mot de passe:</label>
+          <label htmlFor="password">Password:</label>
           <input
             type="password"
             id="password"
@@ -71,7 +71,14 @@ const Login = () => {
             onChange={handleChange}
           />
         </div>
-        <button type="submit">Se connecter</button>
+        <button type="submit">Sign in</button>
+        <button
+          type="button"
+          onClick={() => navigate('/signup')}
+          style={{ marginLeft: '1rem' }}
+        >
+          Create account
+        </button>
       </form>
     </div>
   );
