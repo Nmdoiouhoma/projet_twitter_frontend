@@ -26,7 +26,6 @@ const Signup = () => {
     e.preventDefault();
     console.log('Données du formulaire:', formData);
 
-    // Appel API au backend avec axios
     try {
       const payload = {
         email: formData.email,
@@ -36,16 +35,20 @@ const Signup = () => {
         password: formData.password,
       };
 
-      const response = await axios.post('http://127.0.0.1:8000/register', payload);
+      const response = await axios.post(
+        'http://127.0.0.1:8000/api/register',
+        payload
+      );
       console.log('Inscription réussie:', response.data);
 
       toast.success("Inscription réussie !");
       setTimeout(() => {
         navigate('/login');
-      }, 2000);
-    } catch (error) {
+      }, 1000);
+    } catch (error: any) {
       console.error('Erreur inscription:', error);
-      toast.error("Erreur lors de l'inscription.");
+      const msg = error?.response?.data?.error || "Erreur lors de l'inscription.";
+      toast.error(msg);
     }
   };
   
@@ -115,4 +118,4 @@ const Signup = () => {
   )
 }
 
-export default Signup
+export default Signup;

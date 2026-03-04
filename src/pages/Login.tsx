@@ -21,19 +21,26 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     console.log('Données du formulaire:', formData);
-    
-    // Appel API au backend avec axios
+
     try {
-      const response = await axios.post('http://127.0.0.1:8000/login', formData);
+      const response = await axios.post(
+        'http://127.0.0.1:8000/api/login',
+        formData
+      );
+
       console.log('Connexion réussie:', response.data);
+
+      // on stocke le token pour les routes protégées
+      localStorage.setItem('authToken', response.data.token);
 
       toast.success("Connexion réussie !");
       setTimeout(() => {
         navigate('/');
-      }, 2000);
-    } catch (error) {
+      }, 1000);
+    } catch (error: any) {
       console.error('Erreur connexion:', error);
-      toast.error("Erreur lors de la connexion.");
+      const msg = error?.response?.data?.error || "Erreur lors de la connexion.";
+      toast.error(msg);
     }
   };
 
@@ -44,16 +51,30 @@ const Login = () => {
       <form onSubmit={handleSubmit}>
         <div>
           <label htmlFor="email">Email ou nom d'utilisateur:</label>
-          <input type="text" id="email" name="email" required value={formData.email} onChange={handleChange} />
+          <input
+            type="text"
+            id="email"
+            name="email"
+            required
+            value={formData.email}
+            onChange={handleChange}
+          />
         </div>
         <div>
           <label htmlFor="password">Mot de passe:</label>
-          <input type="password" id="password" name="password" required value={formData.password} onChange={handleChange} />
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            value={formData.password}
+            onChange={handleChange}
+          />
         </div>
         <button type="submit">Se connecter</button>
       </form>
     </div>
-  )
-}
+  );
+};
 
-export default Login
+export default Login;
