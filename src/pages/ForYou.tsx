@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface Author {
   id: number;
@@ -13,6 +15,7 @@ interface Tweet {
   author: Author;
   likeCount: number;
   createdAt: string;
+  likedByCurrentUser?: boolean;
 }
 
 const ForYou = () => {
@@ -139,7 +142,7 @@ const ForYou = () => {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image');
+      toast.error('Please select an image');
       return;
     }
   
@@ -165,7 +168,7 @@ const ForYou = () => {
       setImageUrl(data.url);
       setPreviewImage(data.url);
     } catch (e: any) {
-      alert('Upload error: ' + e.message);
+      toast.error('Upload error: ' + e.message);
     }
   };
   
@@ -173,7 +176,7 @@ const ForYou = () => {
     e.preventDefault();
 
     if (!tweetContent.trim()) {
-      alert('Tweet cannot be empty');
+      toast.error('Tweet cannot be empty');
       return;
     }
 
@@ -212,7 +215,7 @@ const ForYou = () => {
         fileInputRef.current.value = '';
       }
     } catch (e: any) {
-      alert(e.message);
+      toast.error(e.message ?? 'Error while creating tweet');
     } finally {
       setSubmitting(false);
     }
@@ -231,6 +234,120 @@ const ForYou = () => {
     }
   };
 
+  const handleToggleLike = async (tweet: Tweet) => {
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+  
+    const currentlyLiked = !!tweet.likedByCurrentUser;
+  
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/tweets/${tweet.id}/like`, {
+        method: currentlyLiked ? 'DELETE' : 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+  
+      if (res.status === 401) {
+        localStorage.removeItem('authToken');
+        navigate('/login');
+        return;
+      }
+  
+      // Lire d'abord comme texte
+      const raw = await res.text();
+      let data: any = null;
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch {
+        // pas du JSON, on laisse data = null
+      }
+  
+      if (!res.ok) {
+        const backendError =
+          data?.error ||
+          data?.message ||
+          raw || // si c'est une page HTML, tu verras au moins quelque chose dans les logs
+          'Error while toggling like';
+  
+        // Cas particulier "Already liked"
+        if (!currentlyLiked && res.status === 400 && backendError.includes('Already liked')) {
+          // On tente un unlike direct
+          const unlikeRes = await fetch(
+            `http://127.0.0.1:8000/api/tweets/${tweet.id}/like`,
+            {
+              method: 'DELETE',
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+  
+          if (unlikeRes.status === 401) {
+            localStorage.removeItem('authToken');
+            navigate('/login');
+            return;
+          }
+  
+          const unlikeRaw = await unlikeRes.text();
+          let unlikeData: any = null;
+          try {
+            unlikeData = unlikeRaw ? JSON.parse(unlikeRaw) : null;
+          } catch {
+            // ignore
+          }
+  
+          if (!unlikeRes.ok) {
+            throw new Error(
+              unlikeData?.error || unlikeData?.message || 'Error while unliking tweet',
+            );
+          }
+  
+          setTweets((prevTweets) =>
+            prevTweets.map((t) =>
+              t.id === tweet.id
+                ? {
+                    ...t,
+                    likeCount:
+                      typeof unlikeData?.likeCount === 'number'
+                        ? unlikeData.likeCount
+                        : Math.max(0, t.likeCount - 1),
+                    likedByCurrentUser: false,
+                  }
+                : t,
+            ),
+          );
+          toast.success('Like retiré');
+          return;
+        }
+  
+        throw new Error(backendError);
+      }
+  
+      // Succès
+      setTweets((prevTweets) =>
+        prevTweets.map((t) =>
+          t.id === tweet.id
+            ? {
+                ...t,
+                likeCount:
+                  typeof data?.likeCount === 'number'
+                    ? data.likeCount
+                    : t.likeCount + (currentlyLiked ? -1 : 1),
+                likedByCurrentUser: !currentlyLiked,
+              }
+            : t,
+        ),
+      );
+      toast.success(currentlyLiked ? 'Like retiré' : 'Tweet liké');
+    } catch (e: any) {
+      console.error('Like toggle error:', e);
+      toast.error(e.message ?? 'Unknown error while toggling like');
+    }
+  };
+
   return (
     <div
       style={{
@@ -240,6 +357,7 @@ const ForYou = () => {
       }}
     >
       <h1>For You</h1>
+      <ToastContainer />
 
       {/* Barre de recherche */}
       <div
@@ -505,9 +623,31 @@ const ForYou = () => {
                   }}
                 />
               )}
-              <small>
-                ❤️ {tweet.likeCount} · {tweet.createdAt}
-              </small>
+              <div
+                style={{
+                  marginTop: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleToggleLike(tweet)}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    color: tweet.likedByCurrentUser ? '#e0245e' : '#666',
+                  }}
+                >
+                  {tweet.likedByCurrentUser ? '♥' : '♡'}
+                </button>
+                <small>
+                  {tweet.likeCount} · {tweet.createdAt}
+                </small>
+              </div>
             </li>
           ))}
         </ul>

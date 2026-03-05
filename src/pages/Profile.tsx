@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface Tweet {
   id: number;
@@ -7,6 +9,8 @@ interface Tweet {
   createdAt: string;
   imageUrl: string | null;
   likesCount: number;
+  likeCount?: number;
+  likedByCurrentUser?: boolean;
 }
 
 interface UserProfile {
@@ -44,12 +48,16 @@ const Profile = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isFollowing, setIsFollowing] = useState<boolean | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
+  const [editingTweetId, setEditingTweetId] = useState<number | null>(null);
+  const [editingTweetContent, setEditingTweetContent] = useState<string>('');
 
   const handleProfileImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setError('Veuillez sélectionner une image');
+      const msg = 'Veuillez sélectionner une image';
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -68,7 +76,9 @@ const Profile = () => {
       const data = await res.json();
       setNewProfileImage(data.url); 
     } catch (e: any) {
-      setError(e.message ?? 'Erreur inconnue lors de l’upload.');
+      const msg = e.message ?? 'Erreur inconnue lors de l’upload.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setUploadingImage(false);
     }
@@ -156,7 +166,9 @@ const Profile = () => {
           setIsFollowing(null);
         }
       } catch (e: any) {
-        setError(e.message ?? 'Erreur inconnue');
+        const msg = e.message ?? 'Erreur inconnue';
+        setError(msg);
+        toast.error(msg);
       } finally {
         setLoading(false);
       }
@@ -228,8 +240,11 @@ const Profile = () => {
       }
 
       setIsEditing(false);
+      toast.success('Profil mis à jour avec succès');
     } catch (e: any) {
-      setError(e.message ?? 'Erreur inconnue lors de la mise à jour.');
+      const msg = e.message ?? 'Erreur inconnue lors de la mise à jour.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -275,10 +290,232 @@ const Profile = () => {
         throw new Error(data.error || data.message || 'Erreur lors du suivi.');
       }
       setIsFollowing(!isFollowing);
+      toast.success(isFollowing ? 'Vous ne suivez plus cet utilisateur.' : 'Vous suivez cet utilisateur.');
     } catch (e: any) {
-      setError(e.message ?? 'Erreur inconnue lors du suivi.');
+      const msg = e.message ?? 'Erreur inconnue lors du suivi.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setFollowLoading(false);
+    }
+  };
+
+  const handleToggleLike = async (tweet: Tweet) => {
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    const currentlyLiked = !!tweet.likedByCurrentUser;
+
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/tweets/${tweet.id}/like`, {
+        method: currentlyLiked ? 'DELETE' : 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem('authToken');
+        navigate('/login');
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        const backendError = (data && (data as any).error) || (data && (data as any).message) || '';
+
+        // Même logique que ForYou : si le backend dit "Already liked" alors que
+        // le front ne le savait pas, on enchaîne avec un unlike.
+        if (!currentlyLiked && res.status === 400 && backendError === 'Already liked') {
+          const unlikeRes = await fetch(
+            `http://127.0.0.1:8000/api/tweets/${tweet.id}/like`,
+            {
+              method: 'DELETE',
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+
+          if (unlikeRes.status === 401) {
+            localStorage.removeItem('authToken');
+            navigate('/login');
+            return;
+          }
+
+          const unlikeData = await unlikeRes.json();
+          if (!unlikeRes.ok) {
+            throw new Error(
+              unlikeData.error || unlikeData.message || 'Erreur lors du unlike.',
+            );
+          }
+
+          setProfile((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  tweets: prev.tweets.map((t) =>
+                    t.id === tweet.id
+                      ? {
+                          ...t,
+                          likeCount:
+                            typeof (unlikeData as any).likeCount === 'number'
+                              ? (unlikeData as any).likeCount
+                              : Math.max(0, (t.likeCount ?? t.likesCount) - 1),
+                          likesCount:
+                            typeof (unlikeData as any).likeCount === 'number'
+                              ? (unlikeData as any).likeCount
+                              : Math.max(0, (t.likeCount ?? t.likesCount) - 1),
+                          likedByCurrentUser: false,
+                        }
+                      : t,
+                  ),
+                }
+              : prev,
+          );
+          toast.success('Like retiré');
+          return;
+        }
+
+        throw new Error(backendError || 'Erreur lors du like.');
+      }
+
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              tweets: prev.tweets.map((t) =>
+                t.id === tweet.id
+                  ? {
+                      ...t,
+                      likeCount:
+                        typeof (data as any).likeCount === 'number'
+                          ? (data as any).likeCount
+                          : (t.likeCount ?? t.likesCount) + (currentlyLiked ? -1 : 1),
+                      likesCount:
+                        typeof (data as any).likeCount === 'number'
+                          ? (data as any).likeCount
+                          : (t.likeCount ?? t.likesCount) + (currentlyLiked ? -1 : 1),
+                      likedByCurrentUser: !currentlyLiked,
+                    }
+                  : t,
+              ),
+            }
+          : prev,
+      );
+      toast.success(currentlyLiked ? 'Like retiré' : 'Tweet liké');
+    } catch (e: any) {
+      const msg = e.message ?? 'Erreur inconnue lors du like.';
+      setError(msg);
+      toast.error(msg);
+    }
+  };
+
+  const handleStartEditTweet = (tweet: Tweet) => {
+    if (!isOwnProfile) return;
+    setEditingTweetId(tweet.id);
+    setEditingTweetContent(tweet.content);
+  };
+
+  const handleCancelEditTweet = () => {
+    setEditingTweetId(null);
+    setEditingTweetContent('');
+  };
+
+  const handleSaveTweet = async (tweet: Tweet) => {
+    if (!token || !isOwnProfile || !editingTweetContent.trim()) return;
+
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/tweets/${tweet.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content: editingTweetContent.trim() }),
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem('authToken');
+        navigate('/login');
+        return;
+      }
+
+      const data = await res.json();
+      if (!res.ok || (data && data.error)) {
+        throw new Error(data.error || data.message || 'Erreur lors de la mise à jour du tweet.');
+      }
+
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              tweets: prev.tweets.map((t) =>
+                t.id === tweet.id ? { ...t, content: editingTweetContent.trim() } : t,
+              ),
+            }
+          : prev,
+      );
+
+      setEditingTweetId(null);
+      setEditingTweetContent('');
+      toast.success('Tweet mis à jour avec succès');
+    } catch (e: any) {
+      const msg = e.message ?? 'Erreur inconnue lors de la mise à jour du tweet.';
+      setError(msg);
+      toast.error(msg);
+    }
+  };
+
+  const handleDeleteTweet = async (tweet: Tweet) => {
+    if (!token || !isOwnProfile) return;
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/tweets/${tweet.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem('authToken');
+        navigate('/login');
+        return;
+      }
+
+      if (!res.ok) {
+        let msg = 'Erreur lors de la suppression du tweet.';
+        try {
+          const data = await res.json();
+          msg = data.error || data.message || msg;
+        } catch {
+          // ignore
+        }
+        throw new Error(msg);
+      }
+
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              tweets: prev.tweets.filter((t) => t.id !== tweet.id),
+              tweetsCount: prev.tweetsCount > 0 ? prev.tweetsCount - 1 : 0,
+            }
+          : prev,
+      );
+
+      if (editingTweetId === tweet.id) {
+        setEditingTweetId(null);
+        setEditingTweetContent('');
+      }
+      toast.success('Tweet supprimé avec succès');
+    } catch (e: any) {
+      const msg = e.message ?? 'Erreur inconnue lors de la suppression du tweet.';
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -310,6 +547,7 @@ const Profile = () => {
         margin: '0 auto',
       }}
     >
+      <ToastContainer />
       {/* En-tête profil avec photo + infos */}
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
         {profile.profileImageUrl && (
@@ -510,7 +748,55 @@ const Profile = () => {
               padding: '1rem 0',
             }}
           >
-            <p style={{ margin: '0.25rem 0' }}>{tweet.content}</p>
+            {editingTweetId === tweet.id ? (
+              <div style={{ marginBottom: '0.5rem' }}>
+                <textarea
+                  value={editingTweetContent}
+                  onChange={(e) => setEditingTweetContent(e.target.value)}
+                  style={{
+                    width: '100%',
+                    minHeight: '80px',
+                    padding: '0.5rem',
+                    borderRadius: '4px',
+                    border: '1px solid #ddd',
+                    fontFamily: 'inherit',
+                  }}
+                />
+                <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveTweet(tweet)}
+                    disabled={!editingTweetContent.trim()}
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '16px',
+                      border: 'none',
+                      backgroundColor: '#1DA1F2',
+                      color: 'white',
+                      cursor: !editingTweetContent.trim() ? 'not-allowed' : 'pointer',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    Enregistrer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelEditTweet}
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '16px',
+                      border: '1px solid #ccc',
+                      backgroundColor: 'white',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p style={{ margin: '0.25rem 0' }}>{tweet.content}</p>
+            )}
             {tweet.imageUrl && (
               <img
                 src={tweet.imageUrl}
@@ -524,9 +810,61 @@ const Profile = () => {
                 }}
               />
             )}
-            <small>
-              ❤️ {tweet.likesCount} · {tweet.createdAt}
-            </small>
+            <div
+              style={{
+                marginTop: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => handleToggleLike(tweet)}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  color: tweet.likedByCurrentUser ? '#e0245e' : '#666',
+                }}
+              >
+                {tweet.likedByCurrentUser ? '♥' : '♡'}
+              </button>
+              <small>
+                {(tweet.likeCount ?? tweet.likesCount) ?? 0} · {tweet.createdAt}
+              </small>
+              {isOwnProfile && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleStartEditTweet(tweet)}
+                    style={{
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      color: '#1DA1F2',
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTweet(tweet)}
+                    style={{
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      color: '#e0245e',
+                    }}
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
+            </div>
           </li>
         ))}
       </ul>
