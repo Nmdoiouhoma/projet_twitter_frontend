@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ProtectedRoute from '../ProtectedRoute';
 
 interface Author {
@@ -22,6 +23,7 @@ const Following = () => {
 
   const token = localStorage.getItem('authToken');
   const isAuthenticated = !!token;
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -79,7 +81,13 @@ const Following = () => {
 
   return (
     <ProtectedRoute isAuthenticated={isAuthenticated}>
-      <div style={{ padding: '1rem' }}>
+      <div
+        style={{
+          padding: '1rem',
+          maxWidth: '600px',
+          margin: '0 auto',
+        }}
+      >
         <h1>Following</h1>
         {loading && <p>Loading...</p>}
         {error && <p style={{ color: 'red' }}>{error}</p>}
@@ -92,10 +100,24 @@ const Following = () => {
               key={tweet.id}
               style={{
                 borderBottom: '1px solid #ddd',
-                padding: '0.75rem 0',
+                padding: '1rem 0',
               }}
             >
-              <strong>@{tweet.author.username}</strong>
+              <button
+                type="button"
+                onClick={() => navigate(`/profile/${tweet.author.username}`)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  margin: 0,
+                  color: '#1DA1F2',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                }}
+              >
+                @{tweet.author.username}
+              </button>
               <p style={{ margin: '0.25rem 0' }}>{tweet.content}</p>
               {tweet.imageUrl && (
                 <img
@@ -111,7 +133,7 @@ const Following = () => {
                 />
               )}
               <small>
-                Likes: {tweet.likeCount} · {tweet.createdAt}
+                ❤️ {tweet.likeCount} · {tweet.createdAt}
               </small>
             </li>
           ))}
