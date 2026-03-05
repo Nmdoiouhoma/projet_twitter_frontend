@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import NavBar from './ui/layout/NavBar';
+import CurrentUserBadge from './ui/layout/CurrentUserBadge';
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import Home from './pages/Home';
 import ForYou from './pages/ForYou';
@@ -16,6 +17,7 @@ const Layout = () => {
     <div>
       <NavBar />
       <Outlet />
+      <CurrentUserBadge />
     </div>
   );
 };
@@ -30,7 +32,7 @@ const App = () => {
           <Route path="following" element={<Following />} />
           <Route path="login" element={<Login />} />
           <Route path="signup" element={<Signup />} />
-          <Route path="profile" element={<Profile />} />
+          <Route path="profile/:userName" element={<Profile />} />
           <Route path="*" element={<Error404 />} />
         </Route>
       </Routes>

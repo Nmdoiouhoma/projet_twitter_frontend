@@ -30,8 +30,20 @@ const Login = () => {
 
       console.log('Login success:', response.data);
 
+      const { token, user } = response.data;
+
       // store token for protected routes
-      localStorage.setItem('authToken', response.data.token);
+      localStorage.setItem('authToken', token);
+
+      if (user?.userName) {
+        localStorage.setItem('currentUserName', user.userName);
+      }
+
+      if (user?.profileImageUrl) {
+        localStorage.setItem('currentUserProfileImage', user.profileImageUrl);
+      } else {
+        localStorage.removeItem('currentUserProfileImage');
+      }
 
       toast.success('Login successful!');
       setTimeout(() => {
@@ -43,6 +55,8 @@ const Login = () => {
       toast.error(msg);
     }
   };
+
+
 
   return (
     <div>

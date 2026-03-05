@@ -27,6 +27,12 @@ const ForYou = () => {
   const [previewImage, setPreviewImage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Nouveaux états pour la recherche
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Author[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
   const token = localStorage.getItem('authToken');
 
   useEffect(() => {
@@ -49,7 +55,6 @@ const ForYou = () => {
         });
 
         if (res.status === 401) {
-          // Token expiré ou invalide
           localStorage.removeItem('authToken');
           navigate('/login');
           return;
@@ -79,6 +84,56 @@ const ForYou = () => {
     fetchFeed();
   }, [token, navigate]);
 
+  const handleSearchUser = async (query: string) => {
+    setSearchQuery(query);
+
+    if (!query.trim()) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    try {
+      setSearching(true);
+      const res = await fetch(`http://127.0.0.1:8000/api/user/${query}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data) {
+          // Adapter la forme de la réponse backend (userName -> username)
+          const apiUser = data.data as { id: number; userName?: string; username?: string };
+          const normalizedUser: Author = {
+            id: apiUser.id,
+            username: apiUser.username ?? apiUser.userName ?? '',
+          };
+          setSearchResults([normalizedUser]);
+          setShowSearchResults(true);
+        }
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(true);
+      }
+    } catch (e: any) {
+      console.error('Search error:', e.message);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSelectUser = (username: string) => {
+    setSearchQuery('');
+    setShowSearchResults(false);
+    setSearchResults([]);
+    navigate(`/profile/${username}`);
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -88,7 +143,6 @@ const ForYou = () => {
       return;
     }
   
-    // Direct file upload
     const formData = new FormData();
     formData.append('file', file);
   
@@ -186,6 +240,97 @@ const ForYou = () => {
       }}
     >
       <h1>For You</h1>
+
+      {/* Barre de recherche */}
+      <div
+        style={{
+          marginBottom: '1.5rem',
+          position: 'relative',
+        }}
+      >
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => handleSearchUser(e.target.value)}
+          placeholder="Search users by username..."
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            fontSize: '1rem',
+            border: '1px solid #ddd',
+            borderRadius: '20px',
+            fontFamily: 'inherit',
+          }}
+        />
+        {searching && (
+          <small style={{ color: '#666', marginTop: '0.25rem', display: 'block' }}>
+            Searching...
+          </small>
+        )}
+        {showSearchResults && searchResults.length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              backgroundColor: 'white',
+              border: '1px solid #ddd',
+              borderTop: 'none',
+              borderRadius: '0 0 20px 20px',
+              zIndex: 10,
+            }}
+          >
+            {searchResults.map((user) => (
+              <button
+                key={user.id}
+                type="button"
+                onClick={() => handleSelectUser(user.username)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: 'none',
+                  backgroundColor: 'white',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  borderBottom: '1px solid #eee',
+                  fontSize: '1rem',
+                }}
+                onMouseOver={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f0f0f0';
+                }}
+                onMouseOut={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'white';
+                }}
+              >
+                @{user.username}
+              </button>
+            ))}
+          </div>
+        )}
+        {showSearchResults && searchResults.length === 0 && searchQuery.trim() && !searching && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              backgroundColor: 'white',
+              border: '1px solid #ddd',
+              borderTop: 'none',
+              borderRadius: '0 0 20px 20px',
+              padding: '0.75rem',
+              color: '#666',
+              textAlign: 'center',
+              zIndex: 10,
+            }}
+          >
+            No users found
+          </div>
+        )}
+      </div>
+
+      {/* Formulaire de tweet */}
       <form
         onSubmit={handleTweetSubmit}
         style={{
@@ -315,6 +460,7 @@ const ForYou = () => {
         </div>
       </form>
 
+      {/* Liste des tweets */}
       <div>
         {loading && <p>Loading...</p>}
         {error && <p style={{ color: 'red' }}>{error}</p>}
@@ -330,7 +476,21 @@ const ForYou = () => {
                 padding: '1rem 0',
               }}
             >
-              <strong>@{tweet.author.username}</strong>
+              <button
+                type="button"
+                onClick={() => navigate(`/profile/${tweet.author.username}`)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  margin: 0,
+                  color: '#1DA1F2',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                }}
+              >
+                @{tweet.author.username}
+              </button>
               <p style={{ margin: '0.25rem 0' }}>{tweet.content}</p>
               {tweet.imageUrl && (
                 <img
