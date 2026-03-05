@@ -19,6 +19,8 @@ interface UserProfile {
   tweets: Tweet[];
   tweetsCount: number;
   profileImageUrl?: string | null;
+  followersCount?: number;
+  followingCount?: number;
 }
 
 const Profile = () => {
@@ -40,6 +42,8 @@ const Profile = () => {
 
   const [newProfileImage, setNewProfileImage] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [isFollowing, setIsFollowing] = useState<boolean | null>(null);
+  const [followLoading, setFollowLoading] = useState(false);
 
   const handleProfileImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -121,6 +125,36 @@ const Profile = () => {
           email: loaded.email,
           userName: loaded.username,
         });
+
+        // Déterminer si on suit déjà cet utilisateur (si ce n'est pas soi-même)
+        if (currentUserName && currentUserName !== loaded.username) {
+          try {
+            const followersRes = await fetch(
+              `http://127.0.0.1:8000/api/users/${loaded.id}/followers`,
+              {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+              },
+            );
+            if (followersRes.ok) {
+              const followers: Array<{ id: number; username: string }> =
+                await followersRes.json();
+              const alreadyFollowing = followers.some(
+                (f) => f.username === currentUserName,
+              );
+              setIsFollowing(alreadyFollowing);
+            } else {
+              setIsFollowing(false);
+            }
+          } catch {
+            setIsFollowing(false);
+          }
+        } else {
+          setIsFollowing(null);
+        }
       } catch (e: any) {
         setError(e.message ?? 'Erreur inconnue');
       } finally {
@@ -129,7 +163,7 @@ const Profile = () => {
     };
 
     fetchProfile();
-  }, [token, userName, navigate]);
+  }, [token, userName, navigate, currentUserName]);
 
   const isOwnProfile = profile && currentUserName === profile.username;
 
@@ -220,6 +254,34 @@ const Profile = () => {
     }
   };
 
+  const handleFollowToggle = async () => {
+    if (!profile || !token || isOwnProfile || isFollowing === null) return;
+
+    try {
+      setFollowLoading(true);
+      const url = isFollowing
+        ? `http://127.0.0.1:8000/api/unfollow/user/${profile.id}`
+        : `http://127.0.0.1:8000/api/follow/user/${profile.id}`;
+      const method = isFollowing ? 'DELETE' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || data.message || 'Erreur lors du suivi.');
+      }
+      setIsFollowing(!isFollowing);
+    } catch (e: any) {
+      setError(e.message ?? 'Erreur inconnue lors du suivi.');
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   if (loading) {
     return <p style={{ padding: '1rem' }}>Chargement du profil...</p>;
   }
@@ -270,7 +332,14 @@ const Profile = () => {
           </p>
           <p style={{ margin: '0.25rem 0' }}>{profile.email}</p>
           <p style={{ margin: '0.25rem 0' }}>Inscrit le : {profile.createdAt}</p>
-          <p style={{ margin: '0.25rem 0' }}>Nombre de tweets : {profile.tweetsCount}</p>
+          <p style={{ margin: '0.25rem 0' }}>Tweets : {profile.tweetsCount}</p>
+          {(typeof profile.followersCount === 'number' ||
+            typeof profile.followingCount === 'number') && (
+            <p style={{ margin: '0.25rem 0' }}>
+              Followers : {profile.followersCount ?? 0} · Following :{' '}
+              {profile.followingCount ?? 0}
+            </p>
+          )}
         </div>
       </div>
 
@@ -306,6 +375,28 @@ const Profile = () => {
             }}
           >
             Logout
+          </button>
+        </div>
+      )}
+
+      {/* Bouton suivre / ne plus suivre pour le profil des autres */}
+      {!isOwnProfile && isFollowing !== null && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <button
+            type="button"
+            onClick={handleFollowToggle}
+            disabled={followLoading}
+            style={{
+              padding: '0.5rem 1.5rem',
+              borderRadius: '20px',
+              border: 'none',
+              backgroundColor: isFollowing ? '#e0245e' : '#1DA1F2',
+              color: 'white',
+              cursor: followLoading ? 'not-allowed' : 'pointer',
+              fontWeight: 'bold',
+            }}
+          >
+            {followLoading ? '...' : isFollowing ? 'Ne plus suivre' : 'Suivre'}
           </button>
         </div>
       )}
